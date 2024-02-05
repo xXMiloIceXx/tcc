@@ -8,28 +8,24 @@ if (isset($_GET['id'])) {
 }
 
 if (isset($_POST["updatebtn"])) {
-    $target_dir = "image/";
-    $file_name = basename($_FILES["fileToUpload"]["name"]);
-    $imageFileType = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-    $random_number = rand(10000, 99999);
-    $target_file = $target_dir . date('Y-m-d_H-i-s') . '_' . $random_number . '.' . $imageFileType;
+    $file_tmp = $_FILES['fileToUpload']['tmp_name'];
+    if (!is_null($file_tmp) && $file_tmp != "") {
+        $type = pathinfo($file_tmp, PATHINFO_EXTENSION);
+        $data = file_get_contents($file_tmp);
+        $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+    }
 
     $name   = $_POST["name"];
     $brand  = $_POST["brand"];
     $price  = $_POST["price"];
     $stock  = $_POST["stock"];
 
-    if (is_null($file_name) || $file_name == "") {
+    if (is_null($file_tmp) || $file_tmp == "") {
         mysqli_query($conn, "update products set name='$name', brand='$brand', price='$price', stock='$stock' where id=$id");
         header('Location: index.php');
     } else {
-        if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) {
-            // mysqli_query($conn, "update products set name='$name', age='$age', email='$email', avatar='$target_file' where id=$id");
-            mysqli_query($conn, "update products set name='$name', brand='$brand', price='$price', stock='$stock', product_picture='$target_file' where id=$id");
-            header('Location: index.php');
-        } else {
-            echo "<script>alert('Sorry, there was an error uploading your file.')</script>";
-        }
+        mysqli_query($conn, "update products set name='$name', brand='$brand', price='$price', stock='$stock', product_picture='$base64' where id=$id");
+        header('Location: index.php');
     }
 }
 ?>
