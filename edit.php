@@ -1,34 +1,80 @@
 <?php
 include 'db_connect.php';
 
+// Sanitize input function
+function sanitizeInput($input)
+{
+    return htmlspecialchars(trim($input));
+}
+
+// Fetch user data for the provided ID
 if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    $q1 = mysqli_query($conn, "select * from users where id='$id'");
-    $row = mysqli_fetch_array($q1);
+    $id = intval($_GET['id']); // Ensure ID is an integer
+    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        die("User not found.");
+    }
 }
 
-if (isset($_POST["updatebtn"])) {
-    $file_tmp = $_FILES['fileToUpload']['tmp_name'];
-    if (!is_null($file_tmp) && $file_tmp != "") {
-        $type = pathinfo($file_tmp, PATHINFO_EXTENSION);
-        $data = file_get_contents($file_tmp);
-        $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
-    }
+// Handle form submission for updating user data
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["updatebtn"])) {
+    $base64 = null;
 
-    $username = $_POST["username"];
-    $email    = $_POST["email"];
-    $role     = $_POST["role"];
-    $status   = $_POST["status"];
+    // Sanitize inputs
+    $username = sanitizeInput($_POST["username"] ?? '');
+    $role = sanitizeInput($_POST["role"] ?? '');
+    $status = sanitizeInput($_POST["status"] ?? '');
 
-    if (is_null($file_tmp) || $file_tmp == "") {
-        mysqli_query($conn, "update users set username='$username', email='$email', role='$role', status='$status' where id=$id");
-        header('Location: index.php');
+    // Handle file upload if a new file is provided
+    if (!empty($_FILES['fileToUpload']['tmp_name'])) {
+        $file_tmp = $_FILES['fileToUpload']['tmp_name'];
+        $type = pathinfo($_FILES['fileToUpload']['name'], PATHINFO_EXTENSION);
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+        // Validate file type
+        if (in_array(strtolower($type), $allowed_extensions)) {
+            $data = file_get_contents($file_tmp);
+            $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+        } else {
+            echo "<script>alert('Invalid file type. Only JPG, JPEG, PNG, and GIF are allowed.');</script>";
+            return;
+        }
     } else {
-        mysqli_query($conn, "update users set username='$username', email='$email', role='$role', status='$status', profile_picture='$base64' where id=$id");
-        header('Location: index.php');
+        // If no new image uploaded, keep the current image (if exists)
+        $base64 = $row['profile_picture'] ?? null;
     }
+
+    // Update query with or without profile picture
+    if ($base64) {
+        $query = "UPDATE users SET username = ?, role = ?, status = ?, profile_picture = ? WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("ssssi", $username, $role, $status, $base64, $id);
+    } else {
+        $query = "UPDATE users SET username = ?, role = ?, status = ? WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("sssi", $username, $role, $status, $id);
+    }
+
+    // Execute the update
+    if ($stmt->execute()) {
+        echo "<script>alert('User updated successfully!'); window.location.href = 'index.php';</script>";
+        exit;
+    } else {
+        echo "<script>alert('Error updating user: " . $conn->error . "');</script>";
+    }
+
+    $stmt->close();
 }
+
+$conn->close();
 ?>
+
 <!doctype html>
 <html lang="en">
 
@@ -36,7 +82,7 @@ if (isset($_POST["updatebtn"])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit User</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </head>
 
@@ -47,8 +93,8 @@ if (isset($_POST["updatebtn"])) {
         </div>
         <form method="POST" enctype="multipart/form-data">
             <?php
-            if (isset($row['profile_picture'])) {
-                echo "<img src='" . $row['profile_picture'] . "' class='img-thumbnail' alt='profile_picture'>";
+            if (isset($row['profile_picture']) && !empty($row['profile_picture'])) {
+                echo "<img src='" . $row['profile_picture'] . "' class='img-thumbnail' alt='profile_picture' style='max-height: 150px;'>";
             }
             ?>
             <div class="mb-3">
@@ -60,15 +106,12 @@ if (isset($_POST["updatebtn"])) {
                 <input name="username" type="text" class="form-control" placeholder="Username" value="<?= $_POST['username'] ?? $row['username'] ?>" required>
             </div>
             <div class="mb-3">
-                <div class="mb-3">
-                    <label class="form-label">Role</label>
-                    <select name="role" class="form-control" required>
-                        <option value="member" <?= (isset($_POST['role']) && $_POST['role'] == 'member') || (isset($row['role']) && $row['role'] == 'member') ? 'selected' : '' ?>>Member</option>
-                        <option value="staff" <?= (isset($_POST['role']) && $_POST['role'] == 'staff') || (isset($row['role']) && $row['role'] == 'staff') ? 'selected' : '' ?>>Staff</option>
-                        <option value="admin" <?= (isset($_POST['role']) && $_POST['role'] == 'admin') || (isset($row['role']) && $row['role'] == 'admin') ? 'selected' : '' ?>>Admin</option>
-                    </select>
-                </div>
-
+                <label class="form-label">Role</label>
+                <select name="role" class="form-control" required>
+                    <option value="member" <?= (isset($_POST['role']) && $_POST['role'] == 'member') || (isset($row['role']) && $row['role'] == 'member') ? 'selected' : '' ?>>Member</option>
+                    <option value="staff" <?= (isset($_POST['role']) && $_POST['role'] == 'staff') || (isset($row['role']) && $row['role'] == 'staff') ? 'selected' : '' ?>>Staff</option>
+                    <option value="admin" <?= (isset($_POST['role']) && $_POST['role'] == 'admin') || (isset($row['role']) && $row['role'] == 'admin') ? 'selected' : '' ?>>Admin</option>
+                </select>
             </div>
             <div class="mb-3">
                 <label class="form-label">Status</label>
@@ -83,7 +126,7 @@ if (isset($_POST["updatebtn"])) {
             </div>
         </form>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

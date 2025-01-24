@@ -1,39 +1,75 @@
 <?php
 include 'db_connect.php';
 
-if (isset($_POST["savebtn"])) {
-    $file_tmp = $_FILES['fileToUpload']['tmp_name'];
-    if (!is_null($file_tmp) && $file_tmp != "") {
-        $type = pathinfo($file_tmp, PATHINFO_EXTENSION);
-        $data = file_get_contents($file_tmp);
-        $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["savebtn"])) {
+    // Initialize variables
+    $base64 = null;
+
+    // Handle file upload
+    if (!empty($_FILES['fileToUpload']['tmp_name'])) {
+        $file_tmp = $_FILES['fileToUpload']['tmp_name'];
+        $type = pathinfo($_FILES['fileToUpload']['name'], PATHINFO_EXTENSION);
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+        // Check for valid file type
+        if (in_array(strtolower($type), $allowed_extensions)) {
+            $data = file_get_contents($file_tmp);
+            $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+        } else {
+            echo "<script>alert('Invalid file type. Please upload a JPG, JPEG, PNG, or GIF image.');</script>";
+        }
     }
 
-    $username = $_POST["username"];
-    $email    = $_POST["email"];
-    $role     = $_POST["role"];
-    $status   = $_POST["status"];
+    // Sanitize input
+    $username = htmlspecialchars(trim($_POST["username"] ?? ''));
+    $email = htmlspecialchars(trim($_POST["email"] ?? ''));
+    $role = htmlspecialchars(trim($_POST["role"] ?? ''));
+    $status = htmlspecialchars(trim($_POST["status"] ?? ''));
 
-    if (is_null($file_tmp) || $file_tmp == "") {
-        mysqli_query($conn, "INSERT INTO users (username, email, role, status) VALUES('$username', '$email', '$role', '$status')");
-        header('Location: index.php');
+    // Validate email address
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo "<script>alert('Error: Invalid email address.');</script>";
+    }
+
+    // Check for duplicate email
+    $check_query = "SELECT id FROM users WHERE email = ?";
+    $check_stmt = $conn->prepare($check_query);
+    $check_stmt->bind_param("s", $email);
+    $check_stmt->execute();
+    $check_stmt->store_result();
+
+    if ($check_stmt->num_rows > 0) {
+        // Email already exists
+        echo "<script>alert('Error: The email address is already in use. Please use a different email.');</script>";
+        $check_stmt->close();
+        $conn->close();
     } else {
-        mysqli_query($conn, "INSERT INTO users (username, email, role, status, profile_picture) VALUES('$username', '$email', '$role', '$status', '$base64')");
-        header('Location: index.php');
+        // Insert data into database
+        $query = "INSERT INTO users (username, email, role, status, profile_picture) VALUES (?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("sssss", $username, $email, $role, $status, $base64);
+        $stmt->execute();
+
+        if ($stmt->affected_rows > 0) {
+            echo "<script>alert('User successfully saved!');</script>";
+        } else {
+            echo "<script>alert('Error: Unable to save user. Please try again.');</script>";
+        }
+
+        $stmt->close();
+        $conn->close();
     }
 }
 ?>
+
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Create User</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </head>
-
 <body>
     <div class="container my-5">
         <div class="py-4">
@@ -75,5 +111,4 @@ if (isset($_POST["savebtn"])) {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
-
 </html>
