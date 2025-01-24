@@ -9,16 +9,16 @@ if (isset($_POST["savebtn"])) {
         $base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
     }
 
-    $name   = $_POST["name"];
-    $brand  = $_POST["brand"];
-    $price  = $_POST["price"];
-    $stock  = $_POST["stock"];
+    $username = $_POST["username"];
+    $email    = $_POST["email"];
+    $role     = $_POST["role"];
+    $status   = $_POST["status"];
 
     if (is_null($file_tmp) || $file_tmp == "") {
-        mysqli_query($conn, "INSERT INTO products (name,brand,price,stock) VALUES('$name','$brand','$price','$stock')");
+        mysqli_query($conn, "INSERT INTO users (username, email, role, status) VALUES('$username', '$email', '$role', '$status')");
         header('Location: index.php');
     } else {
-        mysqli_query($conn, "INSERT INTO products (name,brand,price,stock,product_picture) VALUES('$name','$brand','$price','$stock','$base64')");
+        mysqli_query($conn, "INSERT INTO users (username, email, role, status, profile_picture) VALUES('$username', '$email', '$role', '$status', '$base64')");
         header('Location: index.php');
     }
 }
@@ -29,7 +29,7 @@ if (isset($_POST["savebtn"])) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Create Product</title>
+    <title>Create User</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </head>
@@ -37,28 +37,35 @@ if (isset($_POST["savebtn"])) {
 <body>
     <div class="container my-5">
         <div class="py-4">
-            <h4>Create Product</h4>
+            <h4>Create User</h4>
         </div>
         <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
-                <label for="fileToUpload" class="form-label">Product Picture</label>
+                <label for="fileToUpload" class="form-label">Profile Picture</label>
                 <input class="form-control" type="file" id="fileToUpload" name="fileToUpload">
             </div>
             <div class="mb-3">
-                <label class="form-label">Name</label>
-                <input name="name" type="text" class="form-control" placeholder="Name" value="<?= $_POST['name'] ?? null ?>" required>
+                <label class="form-label">Username</label>
+                <input name="username" type="text" class="form-control" placeholder="Username" value="<?= $_POST['username'] ?? null ?>" required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Brand</label>
-                <input name="brand" type="text" class="form-control" placeholder="Brand" value="<?= $_POST['brand'] ?? null ?>" required>
+                <label class="form-label">Email</label>
+                <input name="email" type="email" class="form-control" placeholder="Email" value="<?= $_POST['email'] ?? null ?>" required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Price</label>
-                <input name="price" type="number" class="form-control" placeholder="Price" value="<?= $_POST['price'] ?? null ?>" required>
+                <label class="form-label">Role</label>
+                <select name="role" class="form-control" required>
+                    <option value="member" <?= (isset($_POST['role']) && $_POST['role'] == 'member') || !isset($_POST['role']) ? 'selected' : '' ?>>Member</option>
+                    <option value="staff" <?= isset($_POST['role']) && $_POST['role'] == 'staff' ? 'selected' : '' ?>>Staff</option>
+                    <option value="admin" <?= isset($_POST['role']) && $_POST['role'] == 'admin' ? 'selected' : '' ?>>Admin</option>
+                </select>
             </div>
             <div class="mb-3">
-                <label class="form-label">Stock</label>
-                <input name="stock" type="number" class="form-control" placeholder="Stock" value="<?= $_POST['stock'] ?? null ?>" required>
+                <label class="form-label">Status</label>
+                <select name="status" class="form-control" required>
+                    <option value="active" <?= (isset($_POST['status']) && $_POST['status'] == 'active') ? 'selected' : '' ?>>Active</option>
+                    <option value="inactive" <?= (isset($_POST['status']) && $_POST['status'] == 'inactive') ? 'selected' : '' ?>>Inactive</option>
+                </select>
             </div>
             <div class="mb-3">
                 <a class="btn btn-danger" href="index.php">Cancel</a>
