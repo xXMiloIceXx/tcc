@@ -51,7 +51,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["savebtn"])) {
         $stmt->execute();
 
         if ($stmt->affected_rows > 0) {
-            echo "<script>alert('User successfully saved!');</script>";
+            echo "<script>alert('User successfully saved!');window.location.href = 'index.php';</script>";
+            exit;
         } else {
             echo "<script>alert('Error: Unable to save user. Please try again.');</script>";
         }
